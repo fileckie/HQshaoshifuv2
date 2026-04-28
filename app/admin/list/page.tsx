@@ -6,7 +6,7 @@ import {
   Plus, Search, Calendar, Users, ChevronRight,
   Trash2, Edit2, Eye, QrCode, Printer,
   TrendingUp, Clock, CheckCircle, XCircle,
-  ChevronLeft, Filter, X
+  ChevronLeft, Filter, X, Download
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { toast } from 'sonner'
@@ -245,6 +245,36 @@ export default function AdminListPage() {
               <option value="completed">已结束</option>
               <option value="cancelled">已取消</option>
             </select>
+            <button
+              onClick={() => {
+                const headers = ['主题', '日期', '时间', '主人', '电话', '人数', '席位', '状态']
+                const rows = filteredBanquets.map((b) => [
+                  b.title,
+                  b.date,
+                  b.time,
+                  b.hostName,
+                  '',
+                  String(b.guestCount),
+                  b.roomName,
+                  b.status === 'active' ? '进行中' : b.status === 'completed' ? '已结束' : '已取消',
+                ])
+                const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n')
+                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `宴请列表_${new Date().toISOString().split('T')[0]}.csv`
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                URL.revokeObjectURL(url)
+                toast.success('导出成功')
+              }}
+              className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white/60 hover:text-white hover:border-white/30 transition-colors"
+              title="导出 CSV"
+            >
+              <Download className="w-5 h-5" />
+            </button>
           </div>
         </div>
 

@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { Plus, Trash2, Loader2, MapPin, LayoutGrid, ArrowLeft } from 'lucide-react'
+import { Plus, Trash2, Loader2, MapPin, LayoutGrid, ArrowLeft, User, Star } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -66,7 +66,54 @@ export default function AdminPage() {
   const selectedChannel = watch('bookingChannel')
   const selectedPayment = watch('paymentStatus')
   const guestCount = watch('guestCount')
+  const hostPhoneValue = watch('hostPhone')
   const dates = generateDates(90)
+
+  // 客户自动识别
+  const [customerInfo, setCustomerInfo] = useState<{
+    exists: boolean
+    isReturnCustomer?: boolean
+    name?: string
+    totalVisits?: number
+    tags?: string[]
+    preferences?: { type: string; content: string }[]
+  } | null>(null)
+  const [checkingCustomer, setCheckingCustomer] = useState(false)
+
+  const checkCustomer = useCallback(async (phone: string) => {
+    if (!phone || phone.length < 7) {
+      setCustomerInfo(null)
+      return
+    }
+    setCheckingCustomer(true)
+    try {
+      const res = await fetch(`/api/customers/by-phone?phone=${encodeURIComponent(phone)}`)
+      const result = await res.json()
+      if (result.success && result.exists) {
+        setCustomerInfo({
+          exists: true,
+          isReturnCustomer: result.isReturnCustomer,
+          name: result.customer.name,
+          totalVisits: result.customer.totalVisits,
+          tags: result.customer.tags || [],
+          preferences: result.customer.preferences || [],
+        })
+      } else {
+        setCustomerInfo({ exists: false })
+      }
+    } catch {
+      setCustomerInfo(null)
+    } finally {
+      setCheckingCustomer(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (hostPhoneValue) checkCustomer(hostPhoneValue)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [hostPhoneValue, checkCustomer])
 
   // 加载草稿
   useEffect(() => {
@@ -253,6 +300,41 @@ export default function AdminPage() {
                   placeholder={RESTAURANT.phone}
                   className="w-full bg-transparent border-b border-white/20 focus:border-white px-0 py-3 text-white outline-none placeholder:text-white/30 font-serif"
                 />
+                {checkingCustomer && (
+                  <p className="mt-2 text-white/30 text-xs font-serif">查询客户档案中...</p>
+                )}
+                {customerInfo && (
+                  <div className={`mt-3 p-3 border rounded text-sm font-serif ${
+                    customerInfo.exists
+                      ? 'border-red/20 bg-red/5 text-red'
+                      : 'border-white/10 bg-white/5 text-white/50'
+                  }`}>
+                    {customerInfo.exists ? (
+                      <div className="flex items-start gap-2">
+                        <User className="w-4 h-4 mt-0.5 shrink-0" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span>{customerInfo.name}</span>
+                            {customerInfo.isReturnCustomer && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red text-white text-xs rounded">
+                                <Star className="w-3 h-3" />
+                                回头客
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-white/60 text-xs mt-1">
+                            第 {customerInfo.totalVisits} 次到店
+                            {customerInfo.preferences && customerInfo.preferences.length > 0 && (
+                              <span> · 偏好：{customerInfo.preferences.map(p => p.content).join('、')}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <span>新客户，提交后将自动创建客户档案</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="pt-4">
